@@ -102,6 +102,32 @@ describe('Order API', () => {
       });
     });
 
+    it('should emit new_order event via socket.io upon successful order creation', async () => {
+      const mockEmit = vi.fn();
+      app.set('io', { emit: mockEmit });
+
+      const mockMenuItems = [{ id: 'item1', price: new Prisma.Decimal(10.00) }];
+      (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
+      
+      const mockCreatedOrder = {
+        id: 'new-order-socket',
+        tableNumber: 'T2',
+        totalAmount: new Prisma.Decimal(10.00),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+      };
+      (prisma.order.create as any).mockResolvedValue(mockCreatedOrder);
+
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T2',
+        items: [{ menuItemId: 'item1', quantity: 1 }]
+      });
+
+      expect(response.status).toBe(201);
+      expect(mockEmit).toHaveBeenCalledTimes(1);
+      expect(mockEmit).toHaveBeenCalledWith('new_order', mockCreatedOrder);
+    });
+
     it('should return 400 if items array is empty', async () => {
       const response = await request(app).post('/api/orders').send({
         tableNumber: 'T5',

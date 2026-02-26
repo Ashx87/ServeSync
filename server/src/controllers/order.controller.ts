@@ -88,6 +88,11 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
       });
     });
 
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('new_order', newOrder);
+    }
+
     res.status(201).json(newOrder);
   } catch (error) {
     console.error('Error creating order:', error);
