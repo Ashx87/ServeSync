@@ -8,7 +8,9 @@ vi.mock('../src/config/prisma', () => ({
   default: {
     order: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
     },
     menuItem: {
       findMany: vi.fn(),
@@ -150,7 +152,7 @@ describe('Order API', () => {
       (prisma.menuItem.findMany as any).mockResolvedValue([
         { id: 'item1', price: new Prisma.Decimal(10.00) }
       ]);
-      
+
       const response = await request(app).post('/api/orders').send({
         tableNumber: 'T5',
         items: [
@@ -158,9 +160,133 @@ describe('Order API', () => {
           { menuItemId: 'invalid-item', quantity: 1 }
         ]
       });
-      
+
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('One or more menu items are invalid or unavailable');
+    });
+  });
+
+  describe('PATCH /api/orders/:id/status', () => {
+    const orderId = 'order-123';
+
+    it('should update order status from PENDING to PREPARING', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T1',
+        totalAmount: new Prisma.Decimal(25.00),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        createdAt: new Date('2026-02-28T10:00:00Z'),
+        updatedAt: new Date('2026-02-28T10:00:00Z'),
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const updatedOrder = {
+        ...existingOrder,
+        status: 'PREPARING',
+        updatedAt: new Date('2026-02-28T10:05:00Z'),
+        orderItems: [
+          {
+            id: 'oi-1',
+            orderId,
+            menuItemId: 'item1',
+            quantity: 2,
+            unitPrice: new Prisma.Decimal(12.50),
+            menuItem: { id: 'item1', name: 'Burger' },
+          },
+        ],
+      };
+      (prisma.order.update as any).mockResolvedValue(updatedOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .send({ status: 'PREPARING' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('PREPARING');
+      expect(prisma.order.findUnique).toHaveBeenCalledWith({
+        where: { id: orderId },
+      });
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: orderId },
+        data: { status: 'PREPARING' },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+    });
+
+    it('should emit order_status_update event via socket.io', async () => {
+      const mockEmit = vi.fn();
+      app.set('io', { emit: mockEmit });
+
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T3',
+        totalAmount: new Prisma.Decimal(15.00),
+        status: 'PREPARING',
+        paymentStatus: 'PENDING',
+        createdAt: new Date('2026-02-28T10:00:00Z'),
+        updatedAt: new Date('2026-02-28T10:00:00Z'),
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const updatedOrder = {
+        ...existingOrder,
+        status: 'READY',
+        updatedAt: new Date('2026-02-28T10:10:00Z'),
+        orderItems: [],
+      };
+      (prisma.order.update as any).mockResolvedValue(updatedOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .send({ status: 'READY' });
+
+      expect(response.status).toBe(200);
+      expect(mockEmit).toHaveBeenCalledWith('order_status_update', {
+        orderId,
+        status: 'READY',
+        updatedAt: updatedOrder.updatedAt,
+      });
+    });
+
+    it('should return 404 if order does not exist', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app)
+        .patch('/api/orders/nonexistent-id/status')
+        .send({ status: 'PREPARING' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Order not found');
+    });
+
+    it('should return 400 for invalid status transition', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T1',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        createdAt: new Date('2026-02-28T10:00:00Z'),
+        updatedAt: new Date('2026-02-28T10:00:00Z'),
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .send({ status: 'COMPLETED' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Invalid status transition from PENDING to COMPLETED');
+    });
+
+    it('should return 400 if status is not provided', async () => {
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Status is required');
     });
   });
 });
