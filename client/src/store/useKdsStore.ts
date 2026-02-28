@@ -8,11 +8,11 @@ interface KdsState {
   error: string | null;
   fetchOrders: () => Promise<void>;
   addOrder: (order: Order) => void;
-  updateOrderStatus: (orderId: string, status: string) => void;
-  advanceOrder: (orderId: string, nextStatus: string) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  advanceOrder: (orderId: string, nextStatus: Order['status']) => Promise<void>;
 }
 
-export const useKdsStore = create<KdsState>((set, get) => ({
+export const useKdsStore = create<KdsState>((set) => ({
   orders: [],
   loading: false,
   error: null,
@@ -40,14 +40,14 @@ export const useKdsStore = create<KdsState>((set, get) => ({
         status === 'COMPLETED' || status === 'CANCELLED'
           ? state.orders.filter((o) => o.id !== orderId)
           : state.orders.map((o) =>
-              o.id === orderId ? { ...o, status: status as Order['status'] } : o
+              o.id === orderId ? { ...o, status } : o
             ),
     })),
 
   advanceOrder: async (orderId, nextStatus) => {
+    set({ error: null });
     try {
       await apiClient.patch(`/orders/${orderId}/status`, { status: nextStatus });
-      get().updateOrderStatus(orderId, nextStatus);
     } catch {
       set({ error: 'Failed to update order status' });
     }

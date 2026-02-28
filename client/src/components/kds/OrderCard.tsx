@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Clock, ChefHat, Check, CheckCheck } from 'lucide-react';
 import type { Order } from '../../types/order';
 import { useKdsStore } from '../../store/useKdsStore';
@@ -36,12 +37,19 @@ interface OrderCardProps {
 }
 
 const OrderCard = ({ order }: OrderCardProps) => {
+  const [isPending, setIsPending] = useState(false);
   const advanceOrder = useKdsStore((state) => state.advanceOrder);
   const config = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG];
 
   if (!config) return null;
 
   const Icon = config.buttonIcon;
+
+  const handleAdvance = async () => {
+    setIsPending(true);
+    await advanceOrder(order.id, config.nextStatus);
+    setIsPending(false);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col gap-3">
@@ -71,11 +79,12 @@ const OrderCard = ({ order }: OrderCardProps) => {
       </ul>
 
       <button
-        onClick={() => advanceOrder(order.id, config.nextStatus)}
-        className={`w-full mt-auto py-2 px-3 rounded-md text-white font-medium flex items-center justify-center gap-2 transition-colors ${config.buttonColor}`}
+        onClick={handleAdvance}
+        disabled={isPending}
+        className={`w-full mt-auto py-2 px-3 rounded-md text-white font-medium flex items-center justify-center gap-2 transition-colors ${isPending ? 'opacity-50 cursor-not-allowed' : config.buttonColor}`}
       >
         <Icon className="w-4 h-4" />
-        {config.buttonLabel}
+        {isPending ? 'Updating...' : config.buttonLabel}
       </button>
     </div>
   );

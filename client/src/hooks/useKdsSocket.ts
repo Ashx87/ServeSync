@@ -18,7 +18,7 @@ export const useKdsSocket = () => {
       addOrder(order);
     });
 
-    socket.on('order_status_update', (data: { orderId: string; status: string }) => {
+    socket.on('order_status_update', (data: { orderId: string; status: Order['status'] }) => {
       updateOrderStatus(data.orderId, data.status);
     });
 
