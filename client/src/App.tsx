@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
+import Kitchen from './pages/Kitchen';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
           <Route index element={<Menu />} />
           <Route path="cart" element={<Cart />} />
         </Route>
+        <Route path="/kitchen" element={<Kitchen />} />
       </Routes>
     </Router>
   );
