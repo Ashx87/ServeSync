@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import menuRoutes from './routes/menu.routes';
 import orderRoutes from './routes/order.routes';
+import analyticsRoutes from './routes/analytics.routes';
 
 dotenv.config();
 
@@ -17,5 +18,6 @@ app.get('/health', (req, res) => {
 
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 export default app;
