@@ -89,7 +89,9 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
           }
         },
         include: {
-          orderItems: true
+          orderItems: {
+            include: { menuItem: true }
+          }
         }
       });
     });
