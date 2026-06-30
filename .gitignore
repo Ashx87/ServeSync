@@ -142,3 +142,4 @@ vite.config.ts.timestamp-*
 .claude/
 CLAUDE.md
 docs/
+prisma/
