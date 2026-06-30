@@ -79,6 +79,11 @@ const Cart = () => {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">{item.menuItem.name}</h3>
                   <p className="text-gray-500 text-sm mt-1">${parseFloat(item.menuItem.price).toFixed(2)} each</p>
+                  {item.notes && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2 inline-block">
+                      📝 {item.notes}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">

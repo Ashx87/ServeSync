@@ -18,7 +18,7 @@ export interface CartItem {
 
 interface CartState {
   items: CartItem[];
-  addItem: (menuItem: MenuItem, notes?: string) => void;
+  addItem: (menuItem: MenuItem, quantity?: number, notes?: string) => void;
   removeItem: (menuItemId: string) => void;
   updateQuantity: (menuItemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -28,18 +28,18 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   
-  addItem: (menuItem, notes) => set((state) => {
+  addItem: (menuItem, quantity = 1, notes) => set((state) => {
     const existingItem = state.items.find(item => item.menuItem.id === menuItem.id);
     if (existingItem) {
       return {
         items: state.items.map(item =>
           item.menuItem.id === menuItem.id
-            ? { ...item, quantity: item.quantity + 1, notes: notes || item.notes }
+            ? { ...item, quantity: item.quantity + quantity, notes: notes ?? item.notes }
             : item
         )
       };
     }
-    return { items: [...state.items, { menuItem, quantity: 1, notes }] };
+    return { items: [...state.items, { menuItem, quantity, notes }] };
   }),
 
   removeItem: (menuItemId) => set((state) => ({
