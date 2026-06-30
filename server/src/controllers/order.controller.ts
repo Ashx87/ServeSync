@@ -177,3 +177,89 @@ export const updateOrderStatus = async (req: Request, res: Response): Promise<vo
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const addOrderItems = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: 'Order must contain at least one item' });
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { orderItems: true },
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    if (order.paymentStatus !== 'PENDING') {
+      res.status(409).json({ error: 'Order already settled' });
+      return;
+    }
+
+    const menuItemIds = items.map((item: any) => item.menuItemId);
+
+    const menuItems = await prisma.menuItem.findMany({
+      where: { id: { in: menuItemIds } }
+    });
+
+    if (menuItems.length !== new Set(menuItemIds).size) {
+      res.status(400).json({ error: 'One or more menu items are invalid or unavailable' });
+      return;
+    }
+
+    const newOrderItemsToCreate = items.map((item: any) => {
+      const menuItem = menuItems.find((m) => m.id === item.menuItemId);
+      if (!menuItem) throw new Error('Menu item not found');
+
+      return {
+        menuItemId: item.menuItemId,
+        quantity: item.quantity || 1,
+        unitPrice: Number(menuItem.price),
+        notes: item.notes
+      };
+    });
+
+    let totalAmount = order.orderItems.reduce(
+      (sum, oi) => sum.add(oi.unitPrice.mul(oi.quantity)),
+      new Prisma.Decimal(0)
+    );
+    for (const item of newOrderItemsToCreate) {
+      totalAmount = totalAmount.add(new Prisma.Decimal(item.unitPrice).mul(item.quantity));
+    }
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      return await tx.order.update({
+        where: { id },
+        data: {
+          totalAmount: Number(totalAmount),
+          status: 'PENDING',
+          orderItems: {
+            create: newOrderItemsToCreate
+          }
+        },
+        include: {
+          orderItems: {
+            include: { menuItem: true }
+          }
+        }
+      });
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order_items_updated', updatedOrder);
+    }
+
+    res.status(200).json(updatedOrder);
+  } catch (error) {
+    console.error('Error adding items to order:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
