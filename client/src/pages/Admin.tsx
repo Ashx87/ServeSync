@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
-import { BarChart3, DollarSign, ShoppingBag, TrendingUp } from 'lucide-react';
+import { BarChart3, DollarSign, QrCode, ShoppingBag, TrendingUp } from 'lucide-react';
 import RevenueChart from '../components/admin/RevenueChart';
 import TopItemsChart from '../components/admin/TopItemsChart';
 import CategoryChart from '../components/admin/CategoryChart';
@@ -71,6 +72,13 @@ const Admin = () => {
           <BarChart3 className="w-6 h-6 text-indigo-400" />
           <h1 className="text-xl font-bold">Admin Dashboard</h1>
         </div>
+        <Link
+          to="/admin/qr"
+          className="flex items-center gap-2 px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <QrCode className="w-4 h-4" />
+          QR 管理
+        </Link>
       </header>
 
       {error && (
