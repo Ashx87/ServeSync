@@ -52,6 +52,12 @@ const Receipt = () => {
       }
     });
 
+    socket.on('order_items_updated', (updated: Order) => {
+      if (updated.id === orderId) {
+        setOrder(updated);
+      }
+    });
+
     return () => {
       socket.disconnect();
     };
