@@ -226,19 +226,16 @@ export const addOrderItems = async (req: Request, res: Response): Promise<void> 
       };
     });
 
-    let totalAmount = order.orderItems.reduce(
-      (sum, oi) => sum.add(oi.unitPrice.mul(oi.quantity)),
+    const newItemsTotal = newOrderItemsToCreate.reduce(
+      (sum, item) => sum.add(new Prisma.Decimal(item.unitPrice).mul(item.quantity)),
       new Prisma.Decimal(0)
     );
-    for (const item of newOrderItemsToCreate) {
-      totalAmount = totalAmount.add(new Prisma.Decimal(item.unitPrice).mul(item.quantity));
-    }
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       return await tx.order.update({
         where: { id },
         data: {
-          totalAmount: Number(totalAmount),
+          totalAmount: { increment: Number(newItemsTotal) },
           status: 'PENDING',
           orderItems: {
             create: newOrderItemsToCreate

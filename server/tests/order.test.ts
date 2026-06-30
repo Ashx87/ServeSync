@@ -332,7 +332,7 @@ describe('Order API', () => {
       expect(prisma.order.update).toHaveBeenCalledWith({
         where: { id: orderId },
         data: {
-          totalAmount: 25.5,
+          totalAmount: { increment: 5.5 },
           status: 'PENDING',
           orderItems: {
             create: [
