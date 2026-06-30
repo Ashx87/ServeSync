@@ -9,6 +9,7 @@ export const useKdsSocket = () => {
   const socketRef = useRef<Socket | null>(null);
   const addOrder = useKdsStore((state) => state.addOrder);
   const updateOrderStatus = useKdsStore((state) => state.updateOrderStatus);
+  const upsertOrder = useKdsStore((state) => state.upsertOrder);
 
   useEffect(() => {
     const socket = io(SOCKET_URL);
@@ -22,8 +23,12 @@ export const useKdsSocket = () => {
       updateOrderStatus(data.orderId, data.status);
     });
 
+    socket.on('order_items_updated', (order: Order) => {
+      upsertOrder(order);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [addOrder, updateOrderStatus]);
+  }, [addOrder, updateOrderStatus, upsertOrder]);
 };
