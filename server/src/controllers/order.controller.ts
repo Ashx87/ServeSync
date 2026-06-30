@@ -8,6 +8,30 @@ const VALID_TRANSITIONS: Record<string, string> = {
   READY: 'COMPLETED',
 };
 
+export const getOrderById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        orderItems: {
+          include: { menuItem: true }
+        }
+      }
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    res.status(200).json(order);
+  } catch (error) {
+    console.error('Error fetching order:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getOrders = async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
