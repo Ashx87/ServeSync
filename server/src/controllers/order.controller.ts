@@ -190,7 +190,6 @@ export const addOrderItems = async (req: Request, res: Response): Promise<void> 
 
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { orderItems: true },
     });
 
     if (!order) {
