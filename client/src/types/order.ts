@@ -15,6 +15,7 @@ export interface Order {
   tableNumber: string;
   totalAmount: string;
   status: 'PENDING' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED';
   createdAt: string;
   updatedAt: string;
   orderItems: OrderItem[];

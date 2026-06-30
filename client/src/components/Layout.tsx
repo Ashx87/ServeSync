@@ -1,10 +1,53 @@
+import { useEffect, useRef } from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { ShoppingCart, Utensils } from 'lucide-react';
+import { ShoppingCart, Utensils, ClipboardList } from 'lucide-react';
+import { io, Socket } from 'socket.io-client';
 import { useCartStore } from '../store/useCartStore';
+import { useOrderStore } from '../store/useOrderStore';
+
+const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  PENDING:   '等待廚房確認',
+  PREPARING: '廚房製作中',
+  READY:     '餐點已備好',
+};
+
+const ORDER_STATUS_DOT: Record<string, string> = {
+  PENDING:   'bg-amber-400',
+  PREPARING: 'bg-blue-500',
+  READY:     'bg-green-500',
+};
+
+const ACTIVE_STATUSES = new Set(['PENDING', 'PREPARING', 'READY']);
 
 const Layout = () => {
   const items = useCartStore((state) => state.items);
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
+
+  const lastOrder = useOrderStore((state) => state.lastOrder);
+  const updateLastOrderStatus = useOrderStore((state) => state.updateLastOrderStatus);
+
+  const socketRef = useRef<Socket | null>(null);
+
+  const showOrderBanner = lastOrder !== null && ACTIVE_STATUSES.has(lastOrder.status);
+
+  useEffect(() => {
+    if (!lastOrder) return;
+
+    const socket = io(SOCKET_URL);
+    socketRef.current = socket;
+
+    socket.on('order_status_update', (data: { orderId: string; status: string }) => {
+      if (data.orderId === lastOrder.id) {
+        updateLastOrderStatus(data.status as any);
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [lastOrder?.id, updateLastOrderStatus]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -15,8 +58,20 @@ const Layout = () => {
               <Utensils className="text-blue-600" />
               ServeSync
             </Link>
-            
-            <nav className="flex gap-4">
+
+            <nav className="flex items-center gap-2">
+              {showOrderBanner && (
+                <Link
+                  to={`/receipt/${lastOrder.id}`}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"
+                >
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${ORDER_STATUS_DOT[lastOrder.status]}`} />
+                  <ClipboardList className="w-4 h-4" />
+                  <span className="hidden sm:inline">{ORDER_STATUS_LABEL[lastOrder.status]}</span>
+                  <span className="sm:hidden">我的訂單</span>
+                </Link>
+              )}
+
               <Link to="/" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md font-medium">
                 Menu
               </Link>

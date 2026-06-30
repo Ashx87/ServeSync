@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
+import { useOrderStore } from '../store/useOrderStore';
 import apiClient from '../api/apiClient';
 import { Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
 
 const Cart = () => {
   const { items, removeItem, updateQuantity, getCartTotal, clearCart } = useCartStore();
+  const setLastOrder = useOrderStore((state) => state.setLastOrder);
   const [tableNumber, setTableNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -37,10 +39,10 @@ const Cart = () => {
         }))
       };
 
-      await apiClient.post('/orders', payload);
+      const { data: order } = await apiClient.post('/orders', payload);
       clearCart();
-      alert('Order placed successfully!');
-      navigate('/');
+      setLastOrder({ id: order.id, status: order.status, paymentStatus: order.paymentStatus, tableNumber: order.tableNumber });
+      navigate(`/receipt/${order.id}`, { state: { order } });
     } catch (err: any) {
       console.error('Checkout failed', err);
       setError(err.response?.data?.error || 'Failed to place order. Please try again.');
