@@ -2,22 +2,25 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
 import { useOrderStore } from '../store/useOrderStore';
+import { useTableStore } from '../store/useTableStore';
 import apiClient from '../api/apiClient';
 import { Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
 
 const Cart = () => {
   const { items, removeItem, updateQuantity, getCartTotal, clearCart } = useCartStore();
+  const lastOrder = useOrderStore((state) => state.lastOrder);
   const setLastOrder = useOrderStore((state) => state.setLastOrder);
-  const [tableNumber, setTableNumber] = useState('');
+  const tableNumber = useTableStore((state) => state.tableNumber) ?? '';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const total = getCartTotal();
+  const isAppending = !!lastOrder && lastOrder.tableNumber === tableNumber && lastOrder.paymentStatus === 'PENDING';
 
   const handleCheckout = async () => {
-    if (!tableNumber.trim()) {
-      setError('Please enter a table number');
+    if (!tableNumber) {
+      setError('桌號遺失，請重新掃描 QR code');
       return;
     }
 
@@ -29,17 +32,31 @@ const Cart = () => {
     try {
       setIsSubmitting(true);
       setError('');
-      
-      const payload = {
-        tableNumber,
-        items: items.map(item => ({
-          menuItemId: item.menuItem.id,
-          quantity: item.quantity,
-          notes: item.notes
-        }))
-      };
 
-      const { data: order } = await apiClient.post('/orders', payload);
+      const orderItemsPayload = items.map(item => ({
+        menuItemId: item.menuItem.id,
+        quantity: item.quantity,
+        notes: item.notes
+      }));
+
+      let order;
+      if (isAppending && lastOrder) {
+        try {
+          const response = await apiClient.patch(`/orders/${lastOrder.id}/items`, { items: orderItemsPayload });
+          order = response.data;
+        } catch (err: any) {
+          if (err.response?.status === 404) {
+            const response = await apiClient.post('/orders', { tableNumber, items: orderItemsPayload });
+            order = response.data;
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        const response = await apiClient.post('/orders', { tableNumber, items: orderItemsPayload });
+        order = response.data;
+      }
+
       clearCart();
       setLastOrder({ id: order.id, status: order.status, paymentStatus: order.paymentStatus, tableNumber: order.tableNumber });
       navigate(`/receipt/${order.id}`, { state: { order } });
@@ -129,20 +146,10 @@ const Cart = () => {
       <div className="w-full lg:w-80 flex-shrink-0">
         <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Checkout</h2>
-          
-          <div className="mb-6">
-            <label htmlFor="tableNumber" className="block text-sm font-medium text-gray-700 mb-2">
-              Table Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="tableNumber"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              placeholder="e.g. 12"
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-              required
-            />
+
+          <div className="mb-6 flex items-center justify-between px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg">
+            <span className="text-sm font-medium text-blue-700">桌號</span>
+            <span className="text-lg font-bold text-blue-900">#{tableNumber}</span>
           </div>
 
           <div className="border-t border-gray-100 pt-4 mb-6">
@@ -176,7 +183,7 @@ const Cart = () => {
             {isSubmitting ? (
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
             ) : null}
-            {isSubmitting ? 'Processing...' : 'Place Order'}
+            {isSubmitting ? 'Processing...' : isAppending ? '追加到帳單' : 'Place Order'}
           </button>
         </div>
       </div>
