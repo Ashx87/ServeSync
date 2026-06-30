@@ -289,4 +289,120 @@ describe('Order API', () => {
       expect(response.body.error).toBe('Status is required');
     });
   });
+
+  describe('PATCH /api/orders/:id/items', () => {
+    const orderId = 'order-456';
+
+    it('should append items, recalculate totalAmount, and reset status to PENDING', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'READY',
+        paymentStatus: 'PENDING',
+        orderItems: [
+          { id: 'oi-existing', orderId, menuItemId: 'item1', quantity: 2, unitPrice: new Prisma.Decimal(10.00), notes: null },
+        ],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const mockMenuItems = [{ id: 'item2', price: new Prisma.Decimal(5.50), isAvailable: true }];
+      (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
+
+      const updatedOrder = {
+        ...existingOrder,
+        status: 'PENDING',
+        totalAmount: new Prisma.Decimal(25.50),
+        orderItems: [
+          { id: 'oi-existing', orderId, menuItemId: 'item1', quantity: 2, unitPrice: new Prisma.Decimal(10.00), notes: null, menuItem: { id: 'item1', name: 'Burger' } },
+          { id: 'oi-new', orderId, menuItemId: 'item2', quantity: 1, unitPrice: new Prisma.Decimal(5.50), notes: 'no ice', menuItem: { id: 'item2', name: 'Tea' } },
+        ],
+      };
+      (prisma.order.update as any).mockResolvedValue(updatedOrder);
+
+      const mockEmit = vi.fn();
+      app.set('io', { emit: mockEmit });
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'item2', quantity: 1, notes: 'no ice' }] });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('PENDING');
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: orderId },
+        data: {
+          totalAmount: 25.5,
+          status: 'PENDING',
+          orderItems: {
+            create: [
+              { menuItemId: 'item2', quantity: 1, unitPrice: 5.5, notes: 'no ice' },
+            ],
+          },
+        },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+      expect(mockEmit).toHaveBeenCalledWith('order_items_updated', updatedOrder);
+    });
+
+    it('should return 409 if order is already settled', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'COMPLETED',
+        paymentStatus: 'PAID',
+        orderItems: [],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'item1', quantity: 1 }] });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('Order already settled');
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 if order does not exist', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app)
+        .patch('/api/orders/nonexistent-id/items')
+        .send({ items: [{ menuItemId: 'item1', quantity: 1 }] });
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Order not found');
+    });
+
+    it('should return 400 if items array is empty', async () => {
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Order must contain at least one item');
+    });
+
+    it('should return 400 if a menu item is invalid', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        orderItems: [],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+      (prisma.menuItem.findMany as any).mockResolvedValue([]);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'invalid-item', quantity: 1 }] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('One or more menu items are invalid or unavailable');
+    });
+  });
 });
