@@ -8,6 +8,7 @@ interface KdsState {
   error: string | null;
   fetchOrders: () => Promise<void>;
   addOrder: (order: Order) => void;
+  upsertOrder: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   advanceOrder: (orderId: string, nextStatus: Order['status']) => Promise<void>;
 }
@@ -33,6 +34,16 @@ export const useKdsStore = create<KdsState>((set) => ({
 
   addOrder: (order) =>
     set((state) => ({ orders: [...state.orders, order] })),
+
+  upsertOrder: (order) =>
+    set((state) => {
+      const exists = state.orders.some((o) => o.id === order.id);
+      return {
+        orders: exists
+          ? state.orders.map((o) => (o.id === order.id ? order : o))
+          : [...state.orders, order],
+      };
+    }),
 
   updateOrderStatus: (orderId, status) =>
     set((state) => ({
