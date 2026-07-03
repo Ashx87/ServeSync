@@ -89,4 +89,88 @@ describe('Payment API', () => {
       expect(prisma.payment.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('POST /api/payments/:paymentId/webhook', () => {
+    const paymentId = 'payment-99';
+    const orderId = 'order-99';
+
+    it('marks the payment and order as paid, and emits order_payment_update', async () => {
+      const mockEmit = vi.fn();
+      app.set('io', { emit: mockEmit });
+
+      const existingPayment = {
+        id: paymentId,
+        orderId,
+        status: 'PENDING',
+        amount: new Prisma.Decimal(18.0),
+      };
+      (prisma.payment.findUnique as any).mockResolvedValue(existingPayment);
+
+      const updatedOrder = {
+        id: orderId,
+        tableNumber: 'T9',
+        totalAmount: new Prisma.Decimal(18.0),
+        status: 'READY',
+        paymentStatus: 'PAID',
+        orderItems: [],
+      };
+      (prisma.order.update as any).mockResolvedValue(updatedOrder);
+
+      const response = await request(app).post(`/api/payments/${paymentId}/webhook`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.paymentStatus).toBe('PAID');
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: paymentId },
+        data: { status: 'PAID' },
+      });
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: orderId },
+        data: { paymentStatus: 'PAID' },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+      expect(mockEmit).toHaveBeenCalledWith('order_payment_update', updatedOrder);
+    });
+
+    it('is idempotent when the payment is already PAID', async () => {
+      (prisma.payment.findUnique as any).mockResolvedValue({
+        id: paymentId,
+        orderId,
+        status: 'PAID',
+      });
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: orderId,
+        paymentStatus: 'PAID',
+        orderItems: [],
+      });
+
+      const response = await request(app).post(`/api/payments/${paymentId}/webhook`);
+
+      expect(response.status).toBe(200);
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when the payment is EXPIRED', async () => {
+      (prisma.payment.findUnique as any).mockResolvedValue({
+        id: paymentId,
+        orderId,
+        status: 'EXPIRED',
+      });
+
+      const response = await request(app).post(`/api/payments/${paymentId}/webhook`);
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('Payment is expired');
+    });
+
+    it('returns 404 if the payment does not exist', async () => {
+      (prisma.payment.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app).post('/api/payments/nonexistent-id/webhook');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toBe('Payment not found');
+    });
+  });
 });

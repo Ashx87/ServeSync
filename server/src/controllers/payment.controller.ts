@@ -40,3 +40,53 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const confirmPaymentWebhook = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { paymentId } = req.params;
+
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+
+    if (!payment) {
+      res.status(404).json({ error: 'Payment not found' });
+      return;
+    }
+
+    if (payment.status === 'PAID') {
+      const order = await prisma.order.findUnique({
+        where: { id: payment.orderId },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+      res.status(200).json(order);
+      return;
+    }
+
+    if (payment.status === 'EXPIRED' || payment.status === 'FAILED') {
+      res.status(409).json({ error: `Payment is ${payment.status.toLowerCase()}` });
+      return;
+    }
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: { status: 'PAID' },
+      });
+
+      return tx.order.update({
+        where: { id: payment.orderId },
+        data: { paymentStatus: 'PAID' },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('order_payment_update', updatedOrder);
+    }
+
+    res.status(200).json(updatedOrder);
+  } catch (error) {
+    console.error('Error confirming payment:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
