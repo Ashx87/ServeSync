@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getCategories, getMenuItems } from '../controllers/menu.controller';
+import { getCategories } from '../controllers/category.controller';
+import { getMenuItems } from '../controllers/menuItem.controller';
 
 const router = Router();
 
