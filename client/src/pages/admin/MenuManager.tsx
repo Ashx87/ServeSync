@@ -7,6 +7,7 @@ import {
   getCategories, createCategory, updateCategory, deleteCategory,
   getAllMenuItems, createMenuItem, updateMenuItem, deleteMenuItem,
 } from '../../api/menu';
+import { resolveAssetUrl } from '../../api/apiClient';
 import CategoryForm from '../../components/admin/menu/CategoryForm';
 import MenuItemForm from '../../components/admin/menu/MenuItemForm';
 
@@ -185,7 +186,7 @@ const MenuManager = () => {
                       <td className="py-3">
                         <div className="w-12 h-12 bg-gray-100 rounded-md overflow-hidden flex items-center justify-center">
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            <img src={resolveAssetUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
                           ) : (
                             <span className="text-[10px] text-gray-400">無圖</span>
                           )}

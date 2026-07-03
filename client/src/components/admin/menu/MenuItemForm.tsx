@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { MenuItem } from '../../../store/useCartStore';
 import type { Category } from '../../../types/menu';
 import { uploadImage } from '../../../api/menu';
+import { resolveAssetUrl } from '../../../api/apiClient';
 
 interface MenuItemFormProps {
   item: MenuItem | null;
@@ -90,7 +91,7 @@ const MenuItemForm = ({ item, categories, defaultCategoryId, onSave, onClose }: 
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex items-center justify-center flex-shrink-0">
                 {imageUrl ? (
-                  <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
+                  <img src={resolveAssetUrl(imageUrl)} alt="preview" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-xs text-gray-400">無圖片</span>
                 )}
