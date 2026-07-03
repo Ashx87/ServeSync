@@ -8,6 +8,7 @@ import Receipt from './pages/Receipt';
 import Kitchen from './pages/Kitchen';
 import Admin from './pages/Admin';
 import QrManager from './pages/admin/QrManager';
+import MenuManager from './pages/admin/MenuManager';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/kitchen" element={<Kitchen />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/qr" element={<QrManager />} />
+        <Route path="/admin/menu" element={<MenuManager />} />
       </Routes>
     </Router>
   );
