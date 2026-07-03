@@ -15,6 +15,9 @@ vi.mock('../src/config/prisma', () => ({
     menuItem: {
       findMany: vi.fn(),
     },
+    payment: {
+      updateMany: vi.fn(),
+    },
     $transaction: vi.fn((cb) => cb(prisma)), // Simple mock for transaction
   },
 }));
@@ -343,6 +346,37 @@ describe('Order API', () => {
         include: { orderItems: { include: { menuItem: true } } },
       });
       expect(mockEmit).toHaveBeenCalledWith('order_items_updated', updatedOrder);
+    });
+
+    it('should expire any pending payment attempts for the order', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'READY',
+        paymentStatus: 'PENDING',
+        orderItems: [],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const mockMenuItems = [{ id: 'item2', price: new Prisma.Decimal(5.50), isAvailable: true }];
+      (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
+
+      (prisma.order.update as any).mockResolvedValue({
+        ...existingOrder,
+        status: 'PENDING',
+        totalAmount: new Prisma.Decimal(25.50),
+        orderItems: [],
+      });
+
+      await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'item2', quantity: 1 }] });
+
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId, status: 'PENDING' },
+        data: { status: 'EXPIRED' },
+      });
     });
 
     it('should return 409 if order is already settled', async () => {

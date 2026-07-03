@@ -202,6 +202,11 @@ export const addOrderItems = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    await prisma.payment.updateMany({
+      where: { orderId: id, status: 'PENDING' },
+      data: { status: 'EXPIRED' },
+    });
+
     const menuItemIds = items.map((item: any) => item.menuItemId);
 
     const menuItems = await prisma.menuItem.findMany({
