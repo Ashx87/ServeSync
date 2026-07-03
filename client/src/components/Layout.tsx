@@ -27,6 +27,7 @@ const Layout = () => {
 
   const lastOrder = useOrderStore((state) => state.lastOrder);
   const updateLastOrderStatus = useOrderStore((state) => state.updateLastOrderStatus);
+  const clearLastOrder = useOrderStore((state) => state.clearLastOrder);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -44,10 +45,16 @@ const Layout = () => {
       }
     });
 
+    socket.on('order_payment_update', (data: { id: string; paymentStatus: string }) => {
+      if (data.id === lastOrder.id && data.paymentStatus === 'PAID') {
+        clearLastOrder();
+      }
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [lastOrder?.id, updateLastOrderStatus]);
+  }, [lastOrder?.id, updateLastOrderStatus, clearLastOrder]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
