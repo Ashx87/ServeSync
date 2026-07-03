@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { CheckCircle, ChefHat, Bell, CircleCheck, UtensilsCrossed } from 'lucide-react';
 import apiClient from '../api/apiClient';
 import type { Order } from '../types/order';
+import TngPaymentPanel from '../components/payment/TngPaymentPanel';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
 
@@ -53,6 +54,12 @@ const Receipt = () => {
     });
 
     socket.on('order_items_updated', (updated: Order) => {
+      if (updated.id === orderId) {
+        setOrder(updated);
+      }
+    });
+
+    socket.on('order_payment_update', (updated: Order) => {
       if (updated.id === orderId) {
         setOrder(updated);
       }
@@ -165,6 +172,8 @@ const Receipt = () => {
           <p className="text-xs text-gray-400 mt-3 text-center">訂單狀態將自動更新，無需重新整理頁面</p>
         )}
       </div>
+
+      {order.paymentStatus === 'PENDING' && <TngPaymentPanel orderId={order.id} />}
 
       <button
         onClick={() => navigate('/')}
