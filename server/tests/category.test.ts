@@ -108,6 +108,15 @@ describe('Category API', () => {
       expect(response.status).toBe(409);
       expect(prisma.category.update).not.toHaveBeenCalled();
     });
+
+    it('should reject an empty or whitespace-only name with 400', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue({ id: '1', name: 'Drinks', description: null });
+
+      const response = await request(app).patch('/api/menu/categories/1').send({ name: '   ' });
+
+      expect(response.status).toBe(400);
+      expect(prisma.category.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('DELETE /api/menu/categories/:id', () => {

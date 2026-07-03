@@ -48,6 +48,11 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
+      res.status(400).json({ error: 'Category name is required' });
+      return;
+    }
+
     if (name && name !== category.name) {
       const existing = await prisma.category.findUnique({ where: { name } });
       if (existing) {
