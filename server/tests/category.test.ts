@@ -7,6 +7,10 @@ vi.mock('../src/config/prisma', () => ({
   default: {
     category: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   },
 }));
@@ -40,6 +44,98 @@ describe('Category API', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Internal server error' });
+    });
+  });
+
+  describe('POST /api/menu/categories', () => {
+    it('should create a category', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue(null);
+      const created = { id: '1', name: 'Drinks', description: null, createdAt: new Date(), updatedAt: new Date() };
+      (prisma.category.create as any).mockResolvedValue(created);
+
+      const response = await request(app).post('/api/menu/categories').send({ name: 'Drinks' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.name).toBe('Drinks');
+      expect(prisma.category.create).toHaveBeenCalledWith({ data: { name: 'Drinks', description: undefined } });
+    });
+
+    it('should reject a missing name with 400', async () => {
+      const response = await request(app).post('/api/menu/categories').send({});
+
+      expect(response.status).toBe(400);
+      expect(prisma.category.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a duplicate name with 409', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue({ id: '1', name: 'Drinks' });
+
+      const response = await request(app).post('/api/menu/categories').send({ name: 'Drinks' });
+
+      expect(response.status).toBe(409);
+      expect(prisma.category.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /api/menu/categories/:id', () => {
+    it('should update a category', async () => {
+      (prisma.category.findUnique as any).mockResolvedValueOnce({ id: '1', name: 'Drinks', description: null });
+      (prisma.category.findUnique as any).mockResolvedValueOnce(null);
+      const updated = { id: '1', name: 'Beverages', description: null, createdAt: new Date(), updatedAt: new Date() };
+      (prisma.category.update as any).mockResolvedValue(updated);
+
+      const response = await request(app).patch('/api/menu/categories/1').send({ name: 'Beverages' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('Beverages');
+    });
+
+    it('should return 404 when category does not exist', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app).patch('/api/menu/categories/missing').send({ name: 'X' });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should return 409 on rename collision', async () => {
+      (prisma.category.findUnique as any)
+        .mockResolvedValueOnce({ id: '1', name: 'Drinks', description: null })
+        .mockResolvedValueOnce({ id: '2', name: 'Beverages', description: null });
+
+      const response = await request(app).patch('/api/menu/categories/1').send({ name: 'Beverages' });
+
+      expect(response.status).toBe(409);
+      expect(prisma.category.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /api/menu/categories/:id', () => {
+    it('should delete a category with no menu items', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue({ id: '1', name: 'Drinks', menuItems: [] });
+      (prisma.category.delete as any).mockResolvedValue({});
+
+      const response = await request(app).delete('/api/menu/categories/1');
+
+      expect(response.status).toBe(204);
+      expect(prisma.category.delete).toHaveBeenCalledWith({ where: { id: '1' } });
+    });
+
+    it('should return 404 when category does not exist', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app).delete('/api/menu/categories/missing');
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should return 409 when category still has menu items', async () => {
+      (prisma.category.findUnique as any).mockResolvedValue({ id: '1', name: 'Drinks', menuItems: [{ id: 'i1' }] });
+
+      const response = await request(app).delete('/api/menu/categories/1');
+
+      expect(response.status).toBe(409);
+      expect(prisma.category.delete).not.toHaveBeenCalled();
     });
   });
 });
