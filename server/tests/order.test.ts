@@ -88,9 +88,9 @@ describe('Order API', () => {
       expect(response.status).toBe(201);
       expect(response.body.id).toBe('new-order-1');
       
-      // Verify menuItem lookup
+      // Verify menuItem lookup only considers available items
       expect(prisma.menuItem.findMany).toHaveBeenCalledWith({
-        where: { id: { in: ['item1', 'item2'] } }
+        where: { id: { in: ['item1', 'item2'] }, isAvailable: true }
       });
 
       // Verify order creation
@@ -150,6 +150,62 @@ describe('Order API', () => {
       expect(response.body.error).toBe('Table number is required');
     });
     
+    it('should return 400 if quantity is zero', async () => {
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T5',
+        items: [{ menuItemId: 'item1', quantity: 0 }]
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Quantity must be an integer between 1 and 99');
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if quantity is negative', async () => {
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T5',
+        items: [{ menuItemId: 'item1', quantity: -5 }]
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Quantity must be an integer between 1 and 99');
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 if quantity is not an integer', async () => {
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T5',
+        items: [{ menuItemId: 'item1', quantity: 1.5 }]
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Quantity must be an integer between 1 and 99');
+    });
+
+    it('should return 400 if quantity exceeds the maximum of 99', async () => {
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T5',
+        items: [{ menuItemId: 'item1', quantity: 100 }]
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Quantity must be an integer between 1 and 99');
+    });
+
+    it('should return 400 if a requested item is unavailable', async () => {
+      // Item exists in DB but is unavailable, so the isAvailable filter excludes it
+      (prisma.menuItem.findMany as any).mockResolvedValue([]);
+
+      const response = await request(app).post('/api/orders').send({
+        tableNumber: 'T5',
+        items: [{ menuItemId: 'unavailable-item', quantity: 1 }]
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('One or more menu items are invalid or unavailable');
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    });
+
     it('should return 400 if a menu item is not found', async () => {
       // Mock finding fewer items than requested
       (prisma.menuItem.findMany as any).mockResolvedValue([
@@ -437,6 +493,56 @@ describe('Order API', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('One or more menu items are invalid or unavailable');
+    });
+
+    it('should return 400 if an appended item has an invalid quantity', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        orderItems: [],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'item1', quantity: -2 }] });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Quantity must be an integer between 1 and 99');
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should only look up available menu items when appending', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T4',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'READY',
+        paymentStatus: 'PENDING',
+        orderItems: [],
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const mockMenuItems = [{ id: 'item2', price: new Prisma.Decimal(5.50), isAvailable: true }];
+      (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
+
+      (prisma.order.update as any).mockResolvedValue({
+        ...existingOrder,
+        status: 'PENDING',
+        totalAmount: new Prisma.Decimal(25.50),
+        orderItems: [],
+      });
+
+      await request(app)
+        .patch(`/api/orders/${orderId}/items`)
+        .send({ items: [{ menuItemId: 'item2', quantity: 1 }] });
+
+      expect(prisma.menuItem.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['item2'] }, isAvailable: true }
+      });
     });
   });
 });

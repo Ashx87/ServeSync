@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { Prisma } from '@prisma/client';
+import { requireStringParam } from '../utils/requestParams';
 
 const VALID_TRANSITIONS: Record<string, string> = {
   PENDING: 'PREPARING',
@@ -8,9 +9,21 @@ const VALID_TRANSITIONS: Record<string, string> = {
   READY: 'COMPLETED',
 };
 
+const MAX_QUANTITY_PER_ITEM = 99;
+
+const hasInvalidQuantity = (items: any[]): boolean =>
+  items.some((item: any) => {
+    const quantity = item.quantity ?? 1;
+    return !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY_PER_ITEM;
+  });
+
 export const getOrderById = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Order id is required' });
+      return;
+    }
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -72,10 +85,15 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    if (hasInvalidQuantity(items)) {
+      res.status(400).json({ error: `Quantity must be an integer between 1 and ${MAX_QUANTITY_PER_ITEM}` });
+      return;
+    }
+
     const menuItemIds = items.map((item: any) => item.menuItemId);
 
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds } }
+      where: { id: { in: menuItemIds }, isAvailable: true }
     });
 
     if (menuItems.length !== new Set(menuItemIds).size) {
@@ -134,7 +152,11 @@ export const createOrder = async (req: Request, res: Response): Promise<void> =>
 
 export const updateOrderStatus = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Order id is required' });
+      return;
+    }
     const { status } = req.body;
 
     if (!status) {
@@ -180,11 +202,20 @@ export const updateOrderStatus = async (req: Request, res: Response): Promise<vo
 
 export const addOrderItems = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Order id is required' });
+      return;
+    }
     const { items } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: 'Order must contain at least one item' });
+      return;
+    }
+
+    if (hasInvalidQuantity(items)) {
+      res.status(400).json({ error: `Quantity must be an integer between 1 and ${MAX_QUANTITY_PER_ITEM}` });
       return;
     }
 
@@ -210,7 +241,7 @@ export const addOrderItems = async (req: Request, res: Response): Promise<void> 
     const menuItemIds = items.map((item: any) => item.menuItemId);
 
     const menuItems = await prisma.menuItem.findMany({
-      where: { id: { in: menuItemIds } }
+      where: { id: { in: menuItemIds }, isAvailable: true }
     });
 
     if (menuItems.length !== new Set(menuItemIds).size) {
