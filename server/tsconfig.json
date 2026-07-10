@@ -35,7 +35,9 @@
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
+    // verbatimModuleSyntax is off: source uses ESM syntax but package.json is
+    // "type": "commonjs" (run via tsx), which that flag forbids
+    "verbatimModuleSyntax": false,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",

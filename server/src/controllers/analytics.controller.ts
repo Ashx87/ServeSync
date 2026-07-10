@@ -15,7 +15,7 @@ const buildDateRange = (days: number): string[] => {
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(now.getDate() - i);
-    dates.push(date.toISOString().split('T')[0]);
+    dates.push(date.toISOString().slice(0, 10));
   }
   return dates;
 };
@@ -69,7 +69,7 @@ export const getDailyRevenue = async (req: Request, res: Response): Promise<void
     // Aggregate revenue by date string
     const revenueByDate: Record<string, number> = {};
     for (const order of orders) {
-      const dateKey = order.createdAt.toISOString().split('T')[0];
+      const dateKey = order.createdAt.toISOString().slice(0, 10);
       const amount = decimalToRounded(order.totalAmount);
       revenueByDate[dateKey] = (revenueByDate[dateKey] ?? 0) + amount;
     }

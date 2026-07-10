@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { requireStringParam } from '../utils/requestParams';
 
 export const getCategories = async (req: Request, res: Response) => {
   try {
@@ -39,7 +40,11 @@ export const createCategory = async (req: Request, res: Response): Promise<void>
 
 export const updateCategory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Category id is required' });
+      return;
+    }
     const { name, description } = req.body;
 
     const category = await prisma.category.findUnique({ where: { id } });
@@ -78,7 +83,11 @@ export const updateCategory = async (req: Request, res: Response): Promise<void>
 
 export const deleteCategory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Category id is required' });
+      return;
+    }
 
     const category = await prisma.category.findUnique({
       where: { id },

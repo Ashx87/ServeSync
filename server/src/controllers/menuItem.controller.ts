@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { requireStringParam } from '../utils/requestParams';
 
 export const getMenuItems = async (req: Request, res: Response) => {
   try {
@@ -71,7 +72,11 @@ export const createMenuItem = async (req: Request, res: Response): Promise<void>
 
 export const updateMenuItem = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Menu item id is required' });
+      return;
+    }
     const { name, price, categoryId, description, imageUrl, isAvailable } = req.body;
 
     const menuItem = await prisma.menuItem.findUnique({ where: { id } });
@@ -118,7 +123,11 @@ export const updateMenuItem = async (req: Request, res: Response): Promise<void>
 
 export const deleteMenuItem = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Menu item id is required' });
+      return;
+    }
 
     const menuItem = await prisma.menuItem.findUnique({ where: { id } });
     if (!menuItem) {

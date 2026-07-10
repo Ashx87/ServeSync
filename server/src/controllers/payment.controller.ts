@@ -1,10 +1,15 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { paymentProvider } from '../services/payment';
+import { requireStringParam } from '../utils/requestParams';
 
 export const initiatePayment = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = requireStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: 'Order id is required' });
+      return;
+    }
 
     const order = await prisma.order.findUnique({ where: { id } });
 
@@ -43,7 +48,11 @@ export const initiatePayment = async (req: Request, res: Response): Promise<void
 
 export const confirmPaymentWebhook = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { paymentId } = req.params;
+    const paymentId = requireStringParam(req.params.paymentId);
+    if (!paymentId) {
+      res.status(400).json({ error: 'Payment id is required' });
+      return;
+    }
 
     const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
 
