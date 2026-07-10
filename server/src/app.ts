@@ -14,7 +14,15 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, '..', 'uploads'), {
+    setHeaders: (res) => {
+      // Prevent browsers from sniffing uploaded files into executable content types
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    },
+  })
+);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'ServeSync API is running' });

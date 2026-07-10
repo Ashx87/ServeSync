@@ -6,6 +6,17 @@ import app from '../src/app';
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
+// Minimal valid PNG signature followed by filler content
+const PNG_BUFFER = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.from('filler-image-content'),
+]);
+
+const JPEG_BUFFER = Buffer.concat([
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+  Buffer.from('filler-image-content'),
+]);
+
 describe('Upload API', () => {
   const createdFiles: string[] = [];
 
@@ -19,11 +30,59 @@ describe('Upload API', () => {
   it('should accept a valid image and return its URL', async () => {
     const response = await request(app)
       .post('/api/upload')
-      .attach('image', Buffer.from('fake-image-data'), { filename: 'test.png', contentType: 'image/png' });
+      .attach('image', PNG_BUFFER, { filename: 'test.png', contentType: 'image/png' });
 
     expect(response.status).toBe(201);
     expect(response.body.url).toMatch(/^\/uploads\/.+\.png$/);
     createdFiles.push(path.basename(response.body.url));
+  });
+
+  it('should reject content that does not match its declared image MIME type', async () => {
+    // Declared as image/png but the bytes are HTML — must not be stored
+    const response = await request(app)
+      .post('/api/upload')
+      .attach('image', Buffer.from('<html><script>alert(1)</script></html>'), {
+        filename: 'evil.png',
+        contentType: 'image/png',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it('should derive the stored extension from file content, not the original filename', async () => {
+    // Real PNG bytes but a misleading .html filename — must be stored as .png
+    const response = await request(app)
+      .post('/api/upload')
+      .attach('image', PNG_BUFFER, { filename: 'evil.html', contentType: 'image/png' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.url).toMatch(/^\/uploads\/.+\.png$/);
+    createdFiles.push(path.basename(response.body.url));
+  });
+
+  it('should store a JPEG upload with a .jpg extension', async () => {
+    const response = await request(app)
+      .post('/api/upload')
+      .attach('image', JPEG_BUFFER, { filename: 'photo.jpeg', contentType: 'image/jpeg' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.url).toMatch(/^\/uploads\/.+\.jpg$/);
+    createdFiles.push(path.basename(response.body.url));
+  });
+
+  it('should serve uploaded files with X-Content-Type-Options: nosniff', async () => {
+    const uploadResponse = await request(app)
+      .post('/api/upload')
+      .attach('image', PNG_BUFFER, { filename: 'test.png', contentType: 'image/png' });
+
+    expect(uploadResponse.status).toBe(201);
+    createdFiles.push(path.basename(uploadResponse.body.url));
+
+    const fileResponse = await request(app).get(uploadResponse.body.url);
+
+    expect(fileResponse.status).toBe(200);
+    expect(fileResponse.headers['x-content-type-options']).toBe('nosniff');
   });
 
   it('should reject a non-image file with 400', async () => {
