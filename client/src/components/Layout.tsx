@@ -4,6 +4,7 @@ import { ShoppingCart, Utensils, ClipboardList } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { useCartStore } from '../store/useCartStore';
 import { useOrderStore } from '../store/useOrderStore';
+import { useTableStore } from '../store/useTableStore';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
 
@@ -24,6 +25,8 @@ const ACTIVE_STATUSES = new Set(['PENDING', 'PREPARING', 'READY']);
 const Layout = () => {
   const items = useCartStore((state) => state.items);
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
+
+  const tableNumber = useTableStore((state) => state.tableNumber);
 
   const lastOrder = useOrderStore((state) => state.lastOrder);
   const updateLastOrderStatus = useOrderStore((state) => state.updateLastOrderStatus);
@@ -67,6 +70,12 @@ const Layout = () => {
             </Link>
 
             <nav className="flex items-center gap-2">
+              {tableNumber && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-sm font-medium">
+                  桌號 <span className="font-bold">#{tableNumber}</span>
+                </span>
+              )}
+
               {showOrderBanner && (
                 <Link
                   to={`/receipt/${lastOrder.id}`}
