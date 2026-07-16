@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { describe, it, expect, afterEach } from 'vitest';
 import app from '../src/app';
+import { authHeader } from './helpers/auth';
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
@@ -29,7 +30,7 @@ describe('Upload API', () => {
 
   it('should accept a valid image and return its URL', async () => {
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', PNG_BUFFER, { filename: 'test.png', contentType: 'image/png' });
 
     expect(response.status).toBe(201);
@@ -40,7 +41,7 @@ describe('Upload API', () => {
   it('should reject content that does not match its declared image MIME type', async () => {
     // Declared as image/png but the bytes are HTML — must not be stored
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', Buffer.from('<html><script>alert(1)</script></html>'), {
         filename: 'evil.png',
         contentType: 'image/png',
@@ -53,7 +54,7 @@ describe('Upload API', () => {
   it('should derive the stored extension from file content, not the original filename', async () => {
     // Real PNG bytes but a misleading .html filename — must be stored as .png
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', PNG_BUFFER, { filename: 'evil.html', contentType: 'image/png' });
 
     expect(response.status).toBe(201);
@@ -63,7 +64,7 @@ describe('Upload API', () => {
 
   it('should store a JPEG upload with a .jpg extension', async () => {
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', JPEG_BUFFER, { filename: 'photo.jpeg', contentType: 'image/jpeg' });
 
     expect(response.status).toBe(201);
@@ -73,7 +74,7 @@ describe('Upload API', () => {
 
   it('should serve uploaded files with X-Content-Type-Options: nosniff', async () => {
     const uploadResponse = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', PNG_BUFFER, { filename: 'test.png', contentType: 'image/png' });
 
     expect(uploadResponse.status).toBe(201);
@@ -87,14 +88,14 @@ describe('Upload API', () => {
 
   it('should reject a non-image file with 400', async () => {
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', Buffer.from('not an image'), { filename: 'test.txt', contentType: 'text/plain' });
 
     expect(response.status).toBe(400);
   });
 
   it('should reject a request with no file with 400', async () => {
-    const response = await request(app).post('/api/upload');
+    const response = await request(app).post('/api/upload').set(authHeader('ADMIN'));
 
     expect(response.status).toBe(400);
   });
@@ -102,7 +103,7 @@ describe('Upload API', () => {
   it('should reject a file larger than 5MB with 400', async () => {
     const bigBuffer = Buffer.alloc(6 * 1024 * 1024);
     const response = await request(app)
-      .post('/api/upload')
+      .post('/api/upload').set(authHeader('ADMIN'))
       .attach('image', bigBuffer, { filename: 'big.png', contentType: 'image/png' });
 
     expect(response.status).toBe(400);

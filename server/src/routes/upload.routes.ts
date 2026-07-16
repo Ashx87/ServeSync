@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { upload } from '../middleware/upload';
 import { uploadImage } from '../controllers/upload.controller';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/', (req, res, next) => {
+router.post('/', requireRole('ADMIN'), (req, res, next) => {
   upload.single('image')(req, res, (err: any) => {
     if (err) {
       const message =

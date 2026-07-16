@@ -27,6 +27,11 @@ enum PaymentStatus {
   REFUNDED    // Payment refunded
 }
 
+enum StaffRole {
+  ADMIN       // Full access: menu management, analytics, order operations
+  KITCHEN     // Kitchen display: view orders, advance order status
+}
+
 enum PaymentTransactionStatus {
   PENDING     // QR generated, awaiting confirmation
   PAID        // Webhook confirmed
@@ -84,6 +89,15 @@ model OrderItem {
   notes       String?  // E.g., "no onions", "extra spicy"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model StaffUser {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String
+  role         StaffRole
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Payment {

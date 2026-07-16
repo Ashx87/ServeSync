@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import app from '../src/app';
 import prisma from '../src/config/prisma';
 import { Prisma } from '@prisma/client';
+import { authHeader } from './helpers/auth';
 
 vi.mock('../src/config/prisma', () => ({
   default: {
@@ -94,7 +95,7 @@ describe('Menu Item API', () => {
       const created = { id: '1', name: 'Burger', price: new Prisma.Decimal(9.99), categoryId: 'c1' };
       (prisma.menuItem.create as any).mockResolvedValue(created);
 
-      const response = await request(app).post('/api/menu/items').send({
+      const response = await request(app).post('/api/menu/items').set(authHeader('ADMIN')).send({
         name: 'Burger', price: 9.99, categoryId: 'c1'
       });
 
@@ -106,14 +107,14 @@ describe('Menu Item API', () => {
     });
 
     it('should reject a missing name with 400', async () => {
-      const response = await request(app).post('/api/menu/items').send({ price: 9.99, categoryId: 'c1' });
+      const response = await request(app).post('/api/menu/items').set(authHeader('ADMIN')).send({ price: 9.99, categoryId: 'c1' });
 
       expect(response.status).toBe(400);
       expect(prisma.menuItem.create).not.toHaveBeenCalled();
     });
 
     it('should reject a non-positive price with 400', async () => {
-      const response = await request(app).post('/api/menu/items').send({ name: 'Burger', price: 0, categoryId: 'c1' });
+      const response = await request(app).post('/api/menu/items').set(authHeader('ADMIN')).send({ name: 'Burger', price: 0, categoryId: 'c1' });
 
       expect(response.status).toBe(400);
     });
@@ -121,7 +122,7 @@ describe('Menu Item API', () => {
     it('should reject a nonexistent categoryId with 400', async () => {
       (prisma.category.findUnique as any).mockResolvedValue(null);
 
-      const response = await request(app).post('/api/menu/items').send({ name: 'Burger', price: 9.99, categoryId: 'missing' });
+      const response = await request(app).post('/api/menu/items').set(authHeader('ADMIN')).send({ name: 'Burger', price: 9.99, categoryId: 'missing' });
 
       expect(response.status).toBe(400);
       expect(prisma.menuItem.create).not.toHaveBeenCalled();
@@ -134,7 +135,7 @@ describe('Menu Item API', () => {
       const updated = { id: '1', name: 'Burger', isAvailable: false };
       (prisma.menuItem.update as any).mockResolvedValue(updated);
 
-      const response = await request(app).patch('/api/menu/items/1').send({ isAvailable: false });
+      const response = await request(app).patch('/api/menu/items/1').set(authHeader('ADMIN')).send({ isAvailable: false });
 
       expect(response.status).toBe(200);
       expect(response.body.isAvailable).toBe(false);
@@ -143,7 +144,7 @@ describe('Menu Item API', () => {
     it('should return 404 when menu item does not exist', async () => {
       (prisma.menuItem.findUnique as any).mockResolvedValue(null);
 
-      const response = await request(app).patch('/api/menu/items/missing').send({ isAvailable: false });
+      const response = await request(app).patch('/api/menu/items/missing').set(authHeader('ADMIN')).send({ isAvailable: false });
 
       expect(response.status).toBe(404);
     });
@@ -154,7 +155,7 @@ describe('Menu Item API', () => {
       (prisma.menuItem.findUnique as any).mockResolvedValue({ id: '1', name: 'Burger' });
       (prisma.menuItem.delete as any).mockResolvedValue({});
 
-      const response = await request(app).delete('/api/menu/items/1');
+      const response = await request(app).delete('/api/menu/items/1').set(authHeader('ADMIN'));
 
       expect(response.status).toBe(204);
     });
@@ -162,7 +163,7 @@ describe('Menu Item API', () => {
     it('should return 404 when menu item does not exist', async () => {
       (prisma.menuItem.findUnique as any).mockResolvedValue(null);
 
-      const response = await request(app).delete('/api/menu/items/missing');
+      const response = await request(app).delete('/api/menu/items/missing').set(authHeader('ADMIN'));
 
       expect(response.status).toBe(404);
     });
@@ -171,7 +172,7 @@ describe('Menu Item API', () => {
       (prisma.menuItem.findUnique as any).mockResolvedValue({ id: '1', name: 'Burger' });
       (prisma.menuItem.delete as any).mockRejectedValue({ code: 'P2003' });
 
-      const response = await request(app).delete('/api/menu/items/1');
+      const response = await request(app).delete('/api/menu/items/1').set(authHeader('ADMIN'));
 
       expect(response.status).toBe(409);
     });

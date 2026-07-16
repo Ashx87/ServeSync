@@ -5,8 +5,12 @@ import {
   getCategoryDistribution,
   getSummaryStats,
 } from '../controllers/analytics.controller';
+import { requireRole } from '../middleware/auth';
 
 const router = Router();
+
+// Business analytics are admin-only
+router.use(requireRole('ADMIN'));
 
 router.get('/revenue', getDailyRevenue);
 router.get('/top-items', getTopSellingItems);

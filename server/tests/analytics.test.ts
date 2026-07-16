@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import app from '../src/app';
 import prisma from '../src/config/prisma';
 import { Prisma } from '@prisma/client';
+import { authHeader } from './helpers/auth';
+
+// All analytics endpoints are admin-only
+const getAsAdmin = (url: string) => request(app).get(url).set(authHeader('ADMIN'));
 
 vi.mock('../src/config/prisma', () => ({
   default: {
@@ -48,7 +52,7 @@ describe('Analytics API', () => {
       ];
       (prisma.order.findMany as any).mockResolvedValue(mockOrders);
 
-      const response = await request(app).get('/api/analytics/revenue');
+      const response = await getAsAdmin('/api/analytics/revenue');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -72,7 +76,7 @@ describe('Analytics API', () => {
     it('should accept a custom days parameter', async () => {
       (prisma.order.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/revenue?days=14');
+      const response = await getAsAdmin('/api/analytics/revenue?days=14');
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(14);
@@ -81,7 +85,7 @@ describe('Analytics API', () => {
     it('should cap days parameter at 90', async () => {
       (prisma.order.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/revenue?days=200');
+      const response = await getAsAdmin('/api/analytics/revenue?days=200');
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(90);
@@ -90,7 +94,7 @@ describe('Analytics API', () => {
     it('should pre-fill dates with zero revenue when no orders exist', async () => {
       (prisma.order.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/revenue?days=3');
+      const response = await getAsAdmin('/api/analytics/revenue?days=3');
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(3);
@@ -119,7 +123,7 @@ describe('Analytics API', () => {
       ];
       (prisma.order.findMany as any).mockResolvedValue(mockOrders);
 
-      const response = await request(app).get('/api/analytics/revenue?days=1');
+      const response = await getAsAdmin('/api/analytics/revenue?days=1');
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(1);
@@ -130,7 +134,7 @@ describe('Analytics API', () => {
     it('should return 500 on database error', async () => {
       (prisma.order.findMany as any).mockRejectedValue(new Error('DB error'));
 
-      const response = await request(app).get('/api/analytics/revenue');
+      const response = await getAsAdmin('/api/analytics/revenue');
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal server error');
@@ -153,7 +157,7 @@ describe('Analytics API', () => {
       ];
       (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
 
-      const response = await request(app).get('/api/analytics/top-items');
+      const response = await getAsAdmin('/api/analytics/top-items');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -175,7 +179,7 @@ describe('Analytics API', () => {
       (prisma.orderItem.groupBy as any).mockResolvedValue([]);
       (prisma.menuItem.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/top-items?limit=10');
+      const response = await getAsAdmin('/api/analytics/top-items?limit=10');
 
       expect(response.status).toBe(200);
       expect(prisma.orderItem.groupBy).toHaveBeenCalledWith(
@@ -187,7 +191,7 @@ describe('Analytics API', () => {
       (prisma.orderItem.groupBy as any).mockResolvedValue([]);
       (prisma.menuItem.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/top-items?limit=50');
+      const response = await getAsAdmin('/api/analytics/top-items?limit=50');
 
       expect(response.status).toBe(200);
       expect(prisma.orderItem.groupBy).toHaveBeenCalledWith(
@@ -198,7 +202,7 @@ describe('Analytics API', () => {
     it('should return 500 on database error', async () => {
       (prisma.orderItem.groupBy as any).mockRejectedValue(new Error('DB error'));
 
-      const response = await request(app).get('/api/analytics/top-items');
+      const response = await getAsAdmin('/api/analytics/top-items');
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal server error');
@@ -221,7 +225,7 @@ describe('Analytics API', () => {
       ];
       (prisma.menuItem.findMany as any).mockResolvedValue(mockMenuItems);
 
-      const response = await request(app).get('/api/analytics/category-distribution');
+      const response = await getAsAdmin('/api/analytics/category-distribution');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -239,7 +243,7 @@ describe('Analytics API', () => {
       (prisma.orderItem.groupBy as any).mockResolvedValue([]);
       (prisma.menuItem.findMany as any).mockResolvedValue([]);
 
-      const response = await request(app).get('/api/analytics/category-distribution');
+      const response = await getAsAdmin('/api/analytics/category-distribution');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);
@@ -248,7 +252,7 @@ describe('Analytics API', () => {
     it('should return 500 on database error', async () => {
       (prisma.orderItem.groupBy as any).mockRejectedValue(new Error('DB error'));
 
-      const response = await request(app).get('/api/analytics/category-distribution');
+      const response = await getAsAdmin('/api/analytics/category-distribution');
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal server error');
@@ -264,7 +268,7 @@ describe('Analytics API', () => {
       };
       (prisma.order.aggregate as any).mockResolvedValue(mockAggregate);
 
-      const response = await request(app).get('/api/analytics/summary');
+      const response = await getAsAdmin('/api/analytics/summary');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -289,7 +293,7 @@ describe('Analytics API', () => {
       };
       (prisma.order.aggregate as any).mockResolvedValue(mockAggregate);
 
-      const response = await request(app).get('/api/analytics/summary');
+      const response = await getAsAdmin('/api/analytics/summary');
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
@@ -302,7 +306,7 @@ describe('Analytics API', () => {
     it('should return 500 on database error', async () => {
       (prisma.order.aggregate as any).mockRejectedValue(new Error('DB error'));
 
-      const response = await request(app).get('/api/analytics/summary');
+      const response = await getAsAdmin('/api/analytics/summary');
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe('Internal server error');

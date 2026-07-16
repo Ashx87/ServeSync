@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import app from '../src/app';
 import prisma from '../src/config/prisma';
 import { Prisma } from '@prisma/client';
+import { authHeader } from './helpers/auth';
 
 vi.mock('../src/config/prisma', () => ({
   default: {
@@ -34,7 +35,7 @@ describe('Order API', () => {
       ];
       (prisma.order.findMany as any).mockResolvedValue(mockOrders);
 
-      const response = await request(app).get('/api/orders');
+      const response = await request(app).get('/api/orders').set(authHeader('ADMIN'));
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(1);
@@ -45,7 +46,7 @@ describe('Order API', () => {
     it('should filter orders by status if provided', async () => {
       (prisma.order.findMany as any).mockResolvedValue([]);
       
-      const response = await request(app).get('/api/orders?status=PREPARING');
+      const response = await request(app).get('/api/orders?status=PREPARING').set(authHeader('ADMIN'));
       
       expect(response.status).toBe(200);
       expect(prisma.order.findMany).toHaveBeenCalledWith({
@@ -258,7 +259,7 @@ describe('Order API', () => {
       (prisma.order.update as any).mockResolvedValue(updatedOrder);
 
       const response = await request(app)
-        .patch(`/api/orders/${orderId}/status`)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
         .send({ status: 'PREPARING' });
 
       expect(response.status).toBe(200);
@@ -297,7 +298,7 @@ describe('Order API', () => {
       (prisma.order.update as any).mockResolvedValue(updatedOrder);
 
       const response = await request(app)
-        .patch(`/api/orders/${orderId}/status`)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
         .send({ status: 'READY' });
 
       expect(response.status).toBe(200);
@@ -312,7 +313,7 @@ describe('Order API', () => {
       (prisma.order.findUnique as any).mockResolvedValue(null);
 
       const response = await request(app)
-        .patch('/api/orders/nonexistent-id/status')
+        .patch('/api/orders/nonexistent-id/status').set(authHeader('KITCHEN'))
         .send({ status: 'PREPARING' });
 
       expect(response.status).toBe(404);
@@ -332,7 +333,7 @@ describe('Order API', () => {
       (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
 
       const response = await request(app)
-        .patch(`/api/orders/${orderId}/status`)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
         .send({ status: 'COMPLETED' });
 
       expect(response.status).toBe(400);
@@ -341,7 +342,7 @@ describe('Order API', () => {
 
     it('should return 400 if status is not provided', async () => {
       const response = await request(app)
-        .patch(`/api/orders/${orderId}/status`)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
         .send({});
 
       expect(response.status).toBe(400);
