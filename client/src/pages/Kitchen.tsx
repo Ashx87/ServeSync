@@ -3,6 +3,7 @@ import { useKdsStore } from '../store/useKdsStore';
 import { useKdsSocket } from '../hooks/useKdsSocket';
 import KdsColumn from '../components/kds/KdsColumn';
 import { ChefHat } from 'lucide-react';
+import LogoutButton from '../components/LogoutButton';
 import type { ActiveStatus } from '../types/order';
 
 const COLUMNS: ActiveStatus[] = ['PENDING', 'PREPARING', 'READY'];
@@ -31,9 +32,12 @@ const Kitchen = () => {
           <ChefHat className="w-6 h-6 text-amber-400" />
           <h1 className="text-xl font-bold">KDS - ServeSync Kitchen</h1>
         </div>
-        <span className="text-sm text-gray-400">
-          {orders.length} active order{orders.length !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-400">
+            {orders.length} active order{orders.length !== 1 ? 's' : ''}
+          </span>
+          <LogoutButton />
+        </div>
       </header>
 
       {error && (

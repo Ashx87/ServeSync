@@ -5,6 +5,7 @@ import { BarChart3, DollarSign, QrCode, ShoppingBag, TrendingUp, UtensilsCrossed
 import RevenueChart from '../components/admin/RevenueChart';
 import TopItemsChart from '../components/admin/TopItemsChart';
 import CategoryChart from '../components/admin/CategoryChart';
+import LogoutButton from '../components/LogoutButton';
 
 interface SummaryStats {
   totalOrders: number;
@@ -87,6 +88,7 @@ const Admin = () => {
             <QrCode className="w-4 h-4" />
             QR 管理
           </Link>
+          <LogoutButton />
         </div>
       </header>
 
