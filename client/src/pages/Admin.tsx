@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../api/apiClient';
-import { BarChart3, DollarSign, QrCode, ShoppingBag, TrendingUp, UtensilsCrossed } from 'lucide-react';
+import { BarChart3, DollarSign, QrCode, ReceiptText, ShoppingBag, TrendingUp, UtensilsCrossed } from 'lucide-react';
 import RevenueChart from '../components/admin/RevenueChart';
 import TopItemsChart from '../components/admin/TopItemsChart';
 import CategoryChart from '../components/admin/CategoryChart';
@@ -80,6 +80,13 @@ const Admin = () => {
           >
             <UtensilsCrossed className="w-4 h-4" />
             菜品管理
+          </Link>
+          <Link
+            to="/admin/bills"
+            className="flex items-center gap-2 px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <ReceiptText className="w-4 h-4" />
+            账单管理
           </Link>
           <Link
             to="/admin/qr"

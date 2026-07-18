@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import apiClient from '../api/apiClient';
-import type { Order, ActiveStatus } from '../types/order';
+import type { Order } from '../types/order';
 
 interface KdsState {
   orders: Order[];
@@ -21,12 +21,9 @@ export const useKdsStore = create<KdsState>((set) => ({
   fetchOrders: async () => {
     set({ loading: true, error: null });
     try {
-      const statuses: ActiveStatus[] = ['PENDING', 'PREPARING', 'READY'];
-      const responses = await Promise.all(
-        statuses.map((status) => apiClient.get(`/orders?status=${status}`))
-      );
-      const allOrders = responses.flatMap((res) => res.data);
-      set({ orders: allOrders, loading: false });
+      // Single request for all active (PENDING/PREPARING/READY) orders
+      const response = await apiClient.get<Order[]>('/orders?active=true');
+      set({ orders: response.data, loading: false });
     } catch {
       set({ error: 'Failed to fetch orders', loading: false });
     }

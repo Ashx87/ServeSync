@@ -10,6 +10,7 @@ import Kitchen from './pages/Kitchen';
 import Admin from './pages/Admin';
 import QrManager from './pages/admin/QrManager';
 import MenuManager from './pages/admin/MenuManager';
+import BillsManager from './pages/admin/BillsManager';
 import StaffLogin from './pages/StaffLogin';
 
 function App() {
@@ -59,6 +60,14 @@ function App() {
           element={
             <RequireStaff roles={['ADMIN']}>
               <MenuManager />
+            </RequireStaff>
+          }
+        />
+        <Route
+          path="/admin/bills"
+          element={
+            <RequireStaff roles={['ADMIN']}>
+              <BillsManager />
             </RequireStaff>
           }
         />
