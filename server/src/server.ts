@@ -17,9 +17,15 @@ const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(app);
 
+const allowedOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
 const io = new Server(server, {
   cors: {
-    origin: '*', // To be configured properly in production
+    // Falls back to any origin when CORS_ORIGIN is unset (dev/mock mode)
+    origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
   }
 });

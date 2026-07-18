@@ -13,7 +13,25 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors());
+// Allowed browser origins come from CORS_ORIGIN (comma-separated).
+// When unset (dev/mock mode) every origin is allowed.
+const corsOriginResolver = (
+  origin: string | undefined,
+  callback: (err: Error | null, allow?: boolean) => void
+): void => {
+  const allowed = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  if (allowed.length === 0 || !origin || allowed.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+  callback(null, false);
+};
+
+app.use(cors({ origin: corsOriginResolver }));
 app.use(express.json());
 app.use(
   '/uploads',
