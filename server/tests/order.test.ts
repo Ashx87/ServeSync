@@ -12,6 +12,7 @@ vi.mock('../src/config/prisma', () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
     },
     menuItem: {
       findMany: vi.fn(),
@@ -45,15 +46,80 @@ describe('Order API', () => {
 
     it('should filter orders by status if provided', async () => {
       (prisma.order.findMany as any).mockResolvedValue([]);
-      
+
       const response = await request(app).get('/api/orders?status=PREPARING').set(authHeader('ADMIN'));
-      
+
       expect(response.status).toBe(200);
       expect(prisma.order.findMany).toHaveBeenCalledWith({
         where: { status: 'PREPARING' },
         include: { orderItems: { include: { menuItem: true } } },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        take: 100
       });
+    });
+
+    it('should filter to active statuses when active=true', async () => {
+      (prisma.order.findMany as any).mockResolvedValue([]);
+
+      const response = await request(app).get('/api/orders?active=true').set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(200);
+      expect(prisma.order.findMany).toHaveBeenCalledWith({
+        where: { status: { in: ['PENDING', 'PREPARING', 'READY'] } },
+        include: { orderItems: { include: { menuItem: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 100
+      });
+    });
+
+    it('should return a paginated envelope when page is provided', async () => {
+      const mockOrders = [
+        { id: 'o1', tableNumber: 'T1', totalAmount: new Prisma.Decimal(10), status: 'COMPLETED', paymentStatus: 'PAID' },
+      ];
+      (prisma.order.findMany as any).mockResolvedValue(mockOrders);
+      (prisma.order.count as any).mockResolvedValue(35);
+
+      const response = await request(app)
+        .get('/api/orders?page=2&limit=10')
+        .set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.orders).toHaveLength(1);
+      expect(response.body.total).toBe(35);
+      expect(response.body.page).toBe(2);
+      expect(response.body.limit).toBe(10);
+      expect(prisma.order.findMany).toHaveBeenCalledWith({
+        where: {},
+        include: { orderItems: { include: { menuItem: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: 10,
+        take: 10
+      });
+      expect(prisma.order.count).toHaveBeenCalledWith({ where: {} });
+    });
+
+    it('should reject an invalid page or limit with 400', async () => {
+      const badPage = await request(app).get('/api/orders?page=0').set(authHeader('ADMIN'));
+      expect(badPage.status).toBe(400);
+
+      const badLimit = await request(app).get('/api/orders?page=1&limit=1000').set(authHeader('ADMIN'));
+      expect(badLimit.status).toBe(400);
+    });
+
+    it('should filter by paymentStatus, tableNumber, and date for billing queries', async () => {
+      (prisma.order.findMany as any).mockResolvedValue([]);
+      (prisma.order.count as any).mockResolvedValue(0);
+
+      const response = await request(app)
+        .get('/api/orders?page=1&limit=20&paymentStatus=PAID&tableNumber=T5&date=2026-07-18')
+        .set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(200);
+      const findManyArgs = (prisma.order.findMany as any).mock.calls[0][0];
+      expect(findManyArgs.where.paymentStatus).toBe('PAID');
+      expect(findManyArgs.where.tableNumber).toBe('T5');
+      expect(findManyArgs.where.createdAt.gte).toEqual(new Date('2026-07-18T00:00:00.000Z'));
+      expect(findManyArgs.where.createdAt.lt).toEqual(new Date('2026-07-19T00:00:00.000Z'));
     });
   });
 
@@ -347,6 +413,143 @@ describe('Order API', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Status is required');
+    });
+
+    it('should cancel an unpaid PREPARING order and expire pending payments', async () => {
+      const existingOrder = {
+        id: orderId,
+        tableNumber: 'T1',
+        totalAmount: new Prisma.Decimal(20.00),
+        status: 'PREPARING',
+        paymentStatus: 'PENDING',
+      };
+      (prisma.order.findUnique as any).mockResolvedValue(existingOrder);
+
+      const cancelledOrder = {
+        ...existingOrder,
+        status: 'CANCELLED',
+        updatedAt: new Date('2026-07-18T10:00:00Z'),
+        orderItems: [],
+      };
+      (prisma.order.update as any).mockResolvedValue(cancelledOrder);
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
+        .send({ status: 'CANCELLED' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.status).toBe('CANCELLED');
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId, status: 'PENDING' },
+        data: { status: 'EXPIRED' },
+      });
+    });
+
+    it('should refuse to cancel a paid order with 409', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: orderId,
+        status: 'READY',
+        paymentStatus: 'PAID',
+      });
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
+        .send({ status: 'CANCELLED' });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('Cannot cancel a paid order — refund it instead');
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should refuse to cancel a COMPLETED order with 400', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: orderId,
+        status: 'COMPLETED',
+        paymentStatus: 'PAID',
+      });
+
+      const response = await request(app)
+        .patch(`/api/orders/${orderId}/status`).set(authHeader('KITCHEN'))
+        .send({ status: 'CANCELLED' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Invalid status transition from COMPLETED to CANCELLED');
+    });
+  });
+
+  describe('POST /api/orders/:id/refund', () => {
+    const orderId = 'order-refund';
+
+    it('should refund a paid order: REFUNDED payment status and CANCELLED order', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: orderId,
+        status: 'READY',
+        paymentStatus: 'PAID',
+      });
+
+      const refundedOrder = {
+        id: orderId,
+        status: 'CANCELLED',
+        paymentStatus: 'REFUNDED',
+        updatedAt: new Date('2026-07-18T11:00:00Z'),
+        orderItems: [],
+      };
+      (prisma.order.update as any).mockResolvedValue(refundedOrder);
+
+      const mockEmit = vi.fn();
+      app.set('io', { emit: mockEmit });
+
+      const response = await request(app)
+        .post(`/api/orders/${orderId}/refund`).set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(200);
+      expect(response.body.paymentStatus).toBe('REFUNDED');
+      expect(prisma.order.update).toHaveBeenCalledWith({
+        where: { id: orderId },
+        data: { paymentStatus: 'REFUNDED', status: 'CANCELLED' },
+        include: { orderItems: { include: { menuItem: true } } },
+      });
+      expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+        where: { orderId, status: 'PAID' },
+        data: { status: 'REFUNDED' },
+      });
+      expect(mockEmit).toHaveBeenCalledWith('order_status_update', {
+        orderId,
+        status: 'CANCELLED',
+        updatedAt: refundedOrder.updatedAt,
+      });
+    });
+
+    it('should return 409 when the order is not paid', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue({
+        id: orderId,
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+      });
+
+      const response = await request(app)
+        .post(`/api/orders/${orderId}/refund`).set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toBe('Only paid orders can be refunded');
+      expect(prisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 for an unknown order', async () => {
+      (prisma.order.findUnique as any).mockResolvedValue(null);
+
+      const response = await request(app)
+        .post('/api/orders/unknown/refund').set(authHeader('ADMIN'));
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should require the ADMIN role', async () => {
+      const response = await request(app)
+        .post(`/api/orders/${orderId}/refund`).set(authHeader('KITCHEN'));
+
+      expect(response.status).toBe(403);
+      expect(prisma.order.update).not.toHaveBeenCalled();
     });
   });
 

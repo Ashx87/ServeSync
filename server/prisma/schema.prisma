@@ -37,6 +37,7 @@ enum PaymentTransactionStatus {
   PAID        // Webhook confirmed
   EXPIRED     // Superseded by a newer payment attempt
   FAILED      // Reserved for future use (real provider failure callback)
+  REFUNDED    // Payment returned to the customer after an admin refund
 }
 
 // ---------------------------------------------------------
